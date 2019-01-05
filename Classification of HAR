@@ -126,7 +126,7 @@ ggplot(HAR, aes(subject)) +
 # library(openxlsx)
 # write.xlsx(HAR,"HAR.xlsx",sheetName = "Sheet1",col.names = TRUE,showNA=FALSE)
 
-# To see normalization throughout the Range of scaling dataset
+# To see normalization over the range of scaling dataset
 max(HAR[,1:561], na.rm = FALSE)
 min(HAR[,1:561], na.rm = FALSE)
 
@@ -176,9 +176,6 @@ for(i in 1:5) {
 }
 vect1
 
-# The last dataset_ montecarlo 5
-# [1] 0.9904854 0.7275728 0.9491262 0.9683495 0.9815534
-
 ############################################################################################
 ######################################Sampling 80:20########################################
 ############################################################################################
@@ -225,11 +222,6 @@ vect2 <- vect2 + (1/5)*p_vect
 
 }
 vect2
-
-# The last dataset_ montecarlo 5
-# vect2
-# [1] 0.9869903 0.7377670 0.9456311 0.9595146 0.9802913
-# [1] 0.9870874 0.7341748 0.9422330 0.9634951 0.9830097
 
 ############################################################################################
 ######################################Sampling 70:30########################################
@@ -278,10 +270,6 @@ for(i in 1:5) {
 }
 vect3
 
-# The last dataset_ montecarlo 5
-# vect3
-# [1] 0.9886084 0.7489320 0.9417476 0.9623301 0.9791586
-
 ############################################################################################
 ######################################Sampling 60:40########################################
 ############################################################################################
@@ -329,10 +317,6 @@ for(i in 1:5) {
 }
 vect4
 
-# The last dataset_ montecarlo 5
-# vect4
-
-# [1] 0.9868932 0.7367476 0.9350485 0.9562136 0.9778155
 ############################################################################################
 ############################################################################################
 ############################################################################################
@@ -395,300 +379,3 @@ caret::confusionMatrix(pred_test_rf, testset$Activity, positive="1", mode="every
 ############################################################################################
 ############################################################################################
 ############################################################################################
-
-
-vect2 <- c(0.9869903,0.7377670, 0.9456311, 0.9595146, 0.9802913)
-
-vect1 <- c(0.9904854, 0.7275728, 0.9491262, 0.9683495, 0.9815534)
-
-remove(actual)
-
-
-
-
-############################################################################################
-#################################### Multinomial Logit Regression ##########################
-############################################################################################
-
-# I have to apply Multinomial rather than Logictic because my output variable activity
-# is multinomial not binomial. However, I have still weights problem(too much predictors)
-install.packages('e1071', dependencies = TRUE)
-library(class) 
-library(e1071) 
-library("nnet")
-
-HAR2=HAR
-HAR2$activity <- relevel(HAR2$activity, ref=1)
-
-normalize <- function(x) {
-  return ((x - min(x)) / (max(x) - min(x))) }
-
-HAR_2 <- as.data.frame(lapply(HAR[2:562], normalize))
-
-HAR2[,'train'] <- ifelse(runif(nrow(HAR2))<0.8,1,0)
-#separate training and test sets
-trainset <- HAR2[HAR2$train==1,]
-testset <- HAR2[HAR2$train==0,]
-dim(trainset)
-trainset=trainset[,-564] 
-testset=testset[,-564]
-
-### trainset.multinom <- multinom(activity~., data=trainset)
-## Getting Error:
-# Error in nnet.default(X, Y, w, mask = mask, size = 0, skip = TRUE, softmax = TRUE,  : 
-#                        too many (3384) weights
-
-trainset.multinom <- multinom(activity~., data=trainset[,1:5])
-
-summary(trainset.multinom)
-zvalues <- summary(trainset.multinom)$coefficients / summary(trainset.multinom)$standard.errors
-pnorm(abs(zvalues), lower.tail=FALSE)*2
-???????????????????
-
-
-############################### SVM for classification #################################### 
-library(e1071) # load required library
-set.seed(42) #set seed to ensure reproducible results
-
-####Monte Carlo runs
-#vect=rep(0,5)
-#for(i in 1:100) {  
-  
-  #split into training and test sets
-  n=nrow(HAR) 
-  indexes = sample(n,n*(80/100))
-  trainset = HAR[indexes,]
-  testset = HAR[-indexes,]
-  head(testset)
-  
-  #build model   linear kernel and C-classification (soft margin) with default cost (C=1)
-  svm_lin <- svm(activity~ ., data=trainset, method='C-classification', kernel='linear')
-  svm_pol <- svm(activity~ ., data=trainset, method='C-classification', kernel='polynomial')
-  svm_sig <- svm(activity~ ., data=trainset, method='C-classification', kernel='sigmoid')
-  svm_rad <- svm(activity~ ., data=trainset, method='C-classification', kernel='radial')
-  bnc <- naiveBayes(activity~ ., data=trainset)
-  
-  #test set predictions for linear
-  pred_test <-predict(svm_lin,testset)
-  confusion_matrixlin= table(pred = pred_test, true = testset$activity)
-  p_lin= mean(pred_test==testset$activity)
-  
-  #test set predictions for polynomial
-  pred_test <-predict(svm_pol,testset)
-  confusion_matrixpoly= table(pred = pred_test, true = testset$activity)
-  p_pol= mean(pred_test==testset$activity)
-  
-  #test set predictions for sigmoid
-  pred_test <-predict(svm_sig,testset)
-  confusion_matrixsig= table(pred = pred_test, true = testset$activity)
-  p_sig=mean(pred_test==testset$activity)
-  
-  #test set predictions for radial
-  pred_test <-predict(svm_rad,testset)
-  confusion_matrixrad= table(pred = pred_test, true = testset$activity)
-  p_rad=mean(pred_test==testset$activity)
-  
-  #test set predictions for bnc
-  pred_test <-predict(bnc,testset)
-  confusion_matrixlin= table(pred = pred_test, true = testset$activity)
-  p_bnc= mean(pred_test==testset$activity)
-  
-  p_vect=c(p_lin, p_pol, p_sig, p_rad, p_bnc)
-  #### Radial SVM in first runnýng was the best: 
-  #### [1] 0.9626039 0.9542936 0.8337950 0.9639889 0.8227147
-#  vect=vect+(1/100)*p_vect
-#}
-
-#vect
-
-########################### Decision Trees ################################################
-install.packages('party')
-library("party")
-
-n=nrow(HAR) 
-indexes = sample(n,n*(80/100))
-trainset = HAR[indexes,]
-testset = HAR[-indexes,] 
-# using ctree
-HAR_ctree <- ctree(activity ~ ., data=trainset)
-    
-#test set predictions
-pred_test_ctree <-predict(HAR_ctree, testset)
-confusion_matrix_ctree= table(pred = pred_test_ctree, true = testset$activity)
-p_ctree=mean(pred_test_ctree==testset$activity)
-p_ctree
-
-################################## Artificial Neural Network ##############################
-## Fit neural network ############################################################
-install.packages('neuralnet') # install library
-library(neuralnet) # load library
-
-dataANN <- na.omit(HAR)
-
-# Random sampling
-samplesize = 0.80 * nrow(dataANN)
-set.seed(80)
-index = sample( seq_len ( nrow ( dataANN ) ), size = samplesize )
-
-# Create training and test set
-datatrain = dataANN[ index, ]
-datatest = dataANN[ -index, ]
-
-#######
-## Scale data for neural network ###### getting error here. 
-#max = apply(dataANN , 2 , max)
-#min = apply(dataANN, 2 , min)
-#scaled = scale(dataANN, center = min, scale = max - min)
-
-# creating training and test set
-#trainNN = scaled[index , ]
-#testNN = scaled[-index , ]
-#head(trainNN)
-
-# fit neural network
-set.seed(2)
-NN = neuralnet(activity ~ tBodyAcc.mean.X , data = datatrain, hidden = 3 , linear.output = T )
-
-NN<-nnet(activity~., data=datatrain[,1:50], size=10) 
-# plot neural network
-plot(NN)
-####################################################################################
-## Prediction cyl using neural network in the mtcars 
-predict_testNN = compute(NN, testNN[,c(4:6)])
-predict_testNN = (predict_testNN$net.result * (max(data$cyl) - min(data$cyl))) + min(data$cyl)
-
-plot(datatest$cyl, predict_testNN, col='blue', pch=16, ylab = "predicted cyl  NN", xlab = "real cyl")
-abline(0,1)
-
-# Calculate Root Mean Square Error (RMSE)
-RMSE.NN = sqrt(sum((datatest$cyl - predict_testNN)^2) / nrow(datatest) )
-
-
-###########################################################################################
-################################## KNN ####################################################
-###########################################################################################
-
-str(HAR)
-HAR = HAR[-1]
-round(prop.table(table(HAR$activity)) * 100, digits = 1)
-
-normalize <- function(x) {
-  return ((x - min(x)) / (max(x) - min(x))) }
-
-HAR_n <- as.data.frame(lapply(HAR[2:562], normalize))
-
-HAR_train <- HAR_n[1:2887,]
-HAR_test <- HAR_n[2888:3609,]
-
-HAR_train_labels <- HAR[1:2887, 1]
-HAR_test_labels <- HAR[2888:3609, 1] 
-
-# Fitting model
-library(class)
-
-HAR_test_pred8 <- knn(train = HAR_train, test = HAR_test,cl = HAR_train_labels, k=8)
-HAR_test_pred9 <- knn(train = HAR_train, test = HAR_test,cl = HAR_train_labels, k=9)
-HAR_test_pred10 <- knn(train = HAR_train, test = HAR_test,cl = HAR_train_labels, k=10)
-HAR_test_pred11 <- knn(train = HAR_train, test = HAR_test,cl = HAR_train_labels, k=11)
-HAR_test_pred12 <- knn(train = HAR_train, test = HAR_test,cl = HAR_train_labels, k=12)
-HAR_test_pred60 <- knn(train = HAR_train, test = HAR_test,cl = HAR_train_labels, k=60)
-# Evaluating the model performance
-install.packages("gmodels")
-library(gmodels)
-
-CrossTable( x = HAR_test_labels, y = HAR_test_pred, prop.chisq = FALSE)
-
-confusion_matrix8= table(pred = HAR_test_pred8, true = HAR_test_labels)
-p_knn8= mean(HAR_test_pred8==HAR_test_labels)
-
-confusion_matrix9= table(pred = HAR_test_pred9, true = HAR_test_labels)
-p_knn9= mean(HAR_test_pred9==HAR_test_labels)
-
-confusion_matrix10= table(pred = HAR_test_pred10, true = HAR_test_labels)
-p_knn10= mean(HAR_test_pred10==HAR_test_labels)
-
-confusion_matrix11= table(pred = HAR_test_pred11, true = HAR_test_labels)
-p_knn11= mean(HAR_test_pred11==HAR_test_labels)
-
-confusion_matrix12= table(pred = HAR_test_pred12, true = HAR_test_labels)
-p_knn12= mean(HAR_test_pred12==HAR_test_labels)
-
-confusion_matrix60= table(pred = HAR_test_pred60, true = HAR_test_labels)
-p_knn60= mean(HAR_test_pred60==HAR_test_labels)
-
-v <-c(p_knn8 ,p_knn9, p_knn10, p_knn11, p_knn12, p_knn60)
-v ## the best p_knn9 : 0.9016620499
-
-###########################################################################################
-################################## Random Forest ##########################################
-###########################################################################################
-
-library(party)
-library(randomForest)
-
-
-n=nrow(HAR) 
-indexes = sample(n,n*(80/100))
-trainset = HAR[indexes,]
-testset = HAR[-indexes,]
-head(testset)
-
-# Create the forest.
-output.forest <- randomForest(activity ~ ., data = trainset)
-
-# View the forest results.
-print(output.forest) 
-
-# Importance of each predictor.
-print(importance(output.forest,type = 2)) 
-
-
-pred_test <-predict(output.forest,testset)
-#confusion_matrixlin= table(pred = pred_test, true = testset$activity)
-p_random= mean(pred_test==testset$activity)
-
-
-###########################################################################################
-
-library(parallel)
-detectCores()
-
-
-PCA_comps <- prcomp ( HAR [,-c (562 ,563) ], scale.= TRUE )
-summary ( PCA_comps )
-dim ( PCA_comps$x)
-PCA_comps$rotation [1:5 ,1:5]
-PCA_var <- PCA_comps$sdev^2
-head ( PCA_var, 20)
-PCA_Prop_Var <- PCA_var/ ncol ( HAR [,-c (562 ,563) ])
-head ( PCA_Prop_Var, 10) * 100
-sum ( head ( PCA_Prop_Var, 100) * 100)
-
-plot ( PCA_Prop_Var [1:100] , xlab = "PC",ylab = " Proportion ")
-plot ( cumsum ( PCA_Prop_Var ), xlab = " Principal Components ",ylab = " Proportion of Variance captured ")
-abline (h =0.95)
-abline (v =100)
-
-PCA_HARdata <- data.frame ( HAR$Activity, PCA_comps$x[, 1:100])
-colnames ( PCA_HARdata ) [1] <- 'Activity'
-
-##################################
-
-# ######## Dimensionality Reduction ##############
-# Method 1
-# Correlated features
-library ( caret )
-FullCorrelationMatrix <- cor ( sapply ( HAR [,-c(562 ,563) ], as.numeric ))
-# write . csv( FullCorrelationMatrix , file = " CorrMat .csv ")
-plot ( FullCorrelationMatrix )
-dim ( FullCorrelationMatrix )
-table ( round ( FullCorrelationMatrix , digits = 1))
-
-
-HighCorrelatedList <- findCorrelation (na.omit ( FullCorrelationMatrix ), cutoff =0.8 , names = T, exact = T)
-length ( HighCorrelatedList )
-Uncorrelated <- HAR [, ! colnames ( HAR ) %in% HighCorrelatedList ]
-Uncorrelated <- subset ( Uncorrelated , select = -c( subject ))
-dim ( Uncorrelated )
-rm( FullCorrelationMatrix, HighCorrelatedList, HighCorrelatedList1 ,
-    HighCorrelatedList2 , HighCorrelatedList3 )
